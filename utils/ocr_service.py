@@ -140,9 +140,11 @@ class OCRService:
             # Satır sonlarını boşlukla değiştirerek tek parça bir metin haline getiriyoruz
             cleaned_text = " ".join(raw_text.split())
             
-            # İsmi Bulma (Satırları gez, "Nombre" kelimesini bulursan bir sonraki dolu satırı isim olarak al)
-            extracted_name = "Görselden Algılandı"
+            # 2. İsmi Bulma (Geliştirilmiş Heuristic Yaklaşım)
+            extracted_name = None
             lines = raw_text.split('\n')
+            
+            # Adım A: Klasik "NOMBRE" etiketini ara (Diğer kart formatları için)
             for i, line in enumerate(lines):
                 if "NOMBRE" in line.upper():
                     for next_line in lines[i+1:]:
@@ -150,6 +152,24 @@ class OCRService:
                             extracted_name = next_line.strip()
                             break
                     break
+
+            # Adım B: Eğer isim hala bulunamadıysa (Castilla-La Mancha tasarımları için Fallback)
+            # Fotoğraf altındaki "SOYİSİM, İSİM" formatını yakala
+            if not extracted_name:
+                for line in lines:
+                    clean_line = line.strip()
+                    
+                    # Satırda virgül varsa, yeterince uzunsa ve TAMAMEN BÜYÜK HARFLE yazılmışsa
+                    if "," in clean_line and len(clean_line) > 5 and clean_line.isupper():
+                        upper_line = clean_line.upper()
+                        # Sistemin yanlışlıkla diğer etiketleri isim sanmasını engellemek için filtre
+                        if "CASTILLA" not in upper_line and "TURISMO" not in upper_line:
+                            extracted_name = clean_line
+                            break
+                            
+            # Eğer hala bulunamadıysa varsayılanı ata
+            if not extracted_name:
+                extracted_name = "Görselden Algılandı"
             
             # HATA AYIKLAMA (DEBUG): Tesseract'ın ne gördüğünü backend terminaline yazdır
             print("--- OCR HAM ÇIKTISI ---")

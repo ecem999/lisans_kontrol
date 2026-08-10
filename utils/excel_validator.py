@@ -27,10 +27,11 @@ def normalize_text(text: str) -> str:
     return ' '.join(text.lower().split())
 
 async def check_guide_in_excel(country: str, guide_name: str) -> dict:
-    if not guide_name or guide_name in ["Bilinmiyor", "Görselden Algılandı"]:
+    # KESİN KURAL: İsim okunamadıysa veya boş geldiyse asla arama yapma!
+    if not guide_name or len(guide_name.strip()) < 3 or guide_name in ["Bilinmiyor", "Görselden Algılandı"]:
         return {
             "status": "UNKNOWN",
-            "message": "İsim okunamadığı için Excel listesi kontrolü yapılamıyor."
+            "message": "Kart üzerindeki isim okunamadığı için Excel listesi kontrolü yapılamadı."
         }
         
     country_key = country.lower()
@@ -61,6 +62,10 @@ async def check_guide_in_excel(country: str, guide_name: str) -> dict:
     name_parts = norm_guide_name.split()
     significant_parts = [part for part in name_parts if len(part) > 2]
     
+    logger.info(f"EXCEL_VALIDATOR DEBUG - guide_name: '{guide_name}'")
+    logger.info(f"EXCEL_VALIDATOR DEBUG - norm_guide_name: '{norm_guide_name}'")
+    logger.info(f"EXCEL_VALIDATOR DEBUG - significant_parts: {significant_parts}")
+    
     for index, row in df.iterrows():
         excel_name = row.get("Isim_Soyisim", "")
         norm_excel_name = normalize_text(str(excel_name))
@@ -68,10 +73,11 @@ async def check_guide_in_excel(country: str, guide_name: str) -> dict:
         # Tam eşleşme (OCR ismi Excel isminde veya tam tersi geçiyorsa)
         exact_match = (norm_guide_name in norm_excel_name) or (norm_excel_name in norm_guide_name)
         
-        # Parçalı eşleşme
+        # Parçalı eşleşme (Tam kelime eşleşmesi)
         all_parts_found = False
         if len(name_parts) > 1 and significant_parts:
-             all_parts_found = all(part in norm_excel_name for part in significant_parts)
+             excel_parts = norm_excel_name.split()
+             all_parts_found = all(part in excel_parts for part in significant_parts)
         
         if exact_match or all_parts_found:
             row_number = index + 2
@@ -87,10 +93,12 @@ async def check_guide_in_excel(country: str, guide_name: str) -> dict:
             if country_key == "spain": country_display = "İspanya"
             elif country_key == "france": country_display = "Fransa"
             elif country_key == "italy": country_display = "İtalya"
+            
+            matched_name = row.get("Isim_Soyisim", "")
                     
             return {
                 "status": "VALID",
-                "message": f"İsim {country_display} Excel listesinde {row_number}. sıradaki isimle uyuşuyor.",
+                "message": f"İsim {country_display} Excel listesinde {row_number}. sıradaki '{matched_name}' ismi ile uyuşuyor.",
                 "url": str(source_url)
             }
             

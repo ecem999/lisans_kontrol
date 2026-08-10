@@ -1,0 +1,3 @@
+To https://github.com/ecem999/lisans_kontrol.git
+   d3da82f..51fe43d  main -> main
+branch 'main' set up to track 'origin/main'.
