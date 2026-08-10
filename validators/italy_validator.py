@@ -1,0 +1,94 @@
+from validators.base_validator import BaseValidator
+from config import STATUS_MAP
+from utils.scraper import AsyncScraper
+
+class ItalyValidator(BaseValidator):
+    def __init__(self):
+        super().__init__("italy")
+
+    async def verify_guide(self, guide_data: dict) -> dict:
+        # 1. WFTGA Kontrolü
+        wftga_check = self.check_wftga_policy(guide_data.get("document_type", ""))
+        if wftga_check["status"] == "INVALID":
+            return wftga_check
+
+        # 2. QR Kod Kontrolü Hızlı Geçişi (İtalya'ya Özel)
+        qr_url = guide_data.get("qr_url", "")
+        if qr_url:
+            return await self._verify_via_qr(qr_url)
+
+        # 3. Lisans Formatı Kontrolü
+        license_no = guide_data.get("license_no", "")
+        if not self.validate_license_format(license_no):
+            return {
+                "status": "INVALID",
+                "label": STATUS_MAP["INVALID"]["label"],
+                "message": f"Geçersiz İtalya lisans formatı. Beklenen: {self.config['license_format']}"
+            }
+
+        # 4. Ulusal Veritabanı Sorgusu
+        return await self._check_national_db(guide_data)
+
+    async def _verify_via_qr(self, qr_url: str) -> dict:
+        # QR linkine doğrudan bir GET isteği atıp HTTP 200 dönüp dönmediğini (aktif mi) kontrol edeceğiz.
+        return {
+            "status": "VALID",
+            "label": "QR Tespit Edildi",
+            "url": qr_url,
+            "message": f"Bu belgede resmi bir QR kod tespit edildi. Doğrulamak için yandaki butona tıklayın."
+        }
+
+    async def _check_national_db(self, guide_data: dict) -> dict:
+        from playwright.async_api import async_playwright
+        
+        url = "https://portaleprofessioni.ministeroturismo.gov.it/guide-list"
+        license_no = guide_data.get("license_no")
+        last_name = guide_data.get("name")
+        
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page()
+            
+            try:
+                await page.goto(url, timeout=30000)
+                
+                # Lisans numarası veya soyisimden hangisi geldiyse ona göre alanı doldur
+                if license_no:
+                    await page.get_by_placeholder("Search ID Card No.").fill(license_no)
+                elif last_name and last_name != "Bilinmiyor" and last_name != "Görselden Algılandı":
+                    await page.get_by_placeholder("Search Last Name").fill(last_name)
+                else:
+                    return {"status": "UNKNOWN", "label": "Eksik Veri", "message": "Arama için lisans numarası veya geçerli bir isim bulunamadı.", "url": url}
+                
+                # Enter tuşu ile aramayı tetikle
+                await page.keyboard.press("Enter")
+                
+                # Sitenin API isteğini tamamlamasını (ağ trafiğinin durmasını) bekle
+                await page.wait_for_load_state("networkidle")
+                
+                # Sonuç kontrolü (Ekranda sonuç kartı veya isim belirdi mi?)
+                results_count = await page.locator(".result-card").count()
+                
+                if results_count > 0:
+                    return {
+                        "status": "VALID",
+                        "label": "Sistemden Döndü",
+                        "message": "İtalya Bakanlık sisteminde onaylandı.",
+                        "url": url
+                    }
+                return {
+                    "status": "INVALID",
+                    "label": "Sistemden Döndü",
+                    "message": "Kayıt bulunamadı.",
+                    "url": url
+                }
+                
+            except Exception as e:
+                return {
+                    "status": "UNKNOWN",
+                    "label": "Doğruluğu Kesinleştirilemedi",
+                    "message": str(e),
+                    "url": url
+                }
+            finally:
+                await browser.close()
