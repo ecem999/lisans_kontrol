@@ -51,36 +51,27 @@ class SpainValidator(BaseValidator):
         region_data = regions_config[region]
         search_method = region_data.get("search_method")
         
-        # WHITELIST KONTROLÜ (Playwright ile dernek sayfalarında isim arama)
-        from validators.spain_association_check import check_guide_in_association
-        assoc_result = await check_guide_in_association(region, guide_data.get("name", ""))
+        # YEREL EXCEL DOĞRULAMASI
+        from utils.excel_validator import check_guide_in_excel
         
-        if assoc_result["status"] == "VALID":
-            # Bulunduysa anında dön, diğer ağır scraping işlemlerine (veya manuel yollara) girme!
+        # Excel araması için guide_name'i gönder.
+        # İspanya için Excel'de arama yapılırken bölge fark etmez, ama country = 'spain' olmalı
+        excel_result = await check_guide_in_excel("spain", guide_data.get("name", ""))
+        
+        if excel_result["status"] == "VALID":
             return {
                 "status": "VALID",
                 "label": "Yüksek İhtimalle Doğru",
-                "message": assoc_result["message"],
-                "url": assoc_result.get("url")
+                "message": excel_result["message"],
+                "url": excel_result.get("url")
             }
-        
-        # Bulunamazsa normal (devlet sitesi) akışa devam et:
-        if search_method == "portal_search":
-            return await self._run_portal_scraper(region_data, guide_data)
-        elif search_method == "open_data":
-            return self._check_open_data(region_data, guide_data)
-        elif search_method == "manual_contact":
-            return {
-                "status": "UNKNOWN",
-                "label": STATUS_MAP["UNKNOWN"]["label"],
-                "message": f"{region_data.get('name', region)} bölgesi için online sorgulama yok. {assoc_result['message']}"
-            }
-        else:
-            return {
-                "status": "UNKNOWN",
-                "label": STATUS_MAP["UNKNOWN"]["label"],
-                "message": f"Bu bölge için online doğrulama yapılamıyor. Lütfen yerel otoritelerle görüşün."
-            }
+            
+        # Eğer Excel'de bulunamazsa (eski scraping yerine UNKNOWN dönüyoruz)
+        return {
+            "status": "UNKNOWN",
+            "label": STATUS_MAP["UNKNOWN"]["label"],
+            "message": excel_result["message"]
+        }
 
     async def _run_portal_scraper(self, region_data: dict, guide_data: dict) -> dict:
         url = region_data.get("url")

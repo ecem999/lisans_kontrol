@@ -39,56 +39,20 @@ class ItalyValidator(BaseValidator):
         }
 
     async def _check_national_db(self, guide_data: dict) -> dict:
-        from playwright.async_api import async_playwright
+        from utils.excel_validator import check_guide_in_excel
         
-        url = "https://portaleprofessioni.ministeroturismo.gov.it/guide-list"
-        license_no = guide_data.get("license_no")
-        last_name = guide_data.get("name")
+        excel_result = await check_guide_in_excel("italy", guide_data.get("name", ""))
         
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
+        if excel_result["status"] == "VALID":
+            return {
+                "status": "VALID",
+                "label": "Sistemden Döndü",
+                "message": excel_result["message"],
+                "url": excel_result.get("url")
+            }
             
-            try:
-                await page.goto(url, timeout=30000)
-                
-                # Lisans numarası veya soyisimden hangisi geldiyse ona göre alanı doldur
-                if license_no:
-                    await page.get_by_placeholder("Search ID Card No.").fill(license_no)
-                elif last_name and last_name != "Bilinmiyor" and last_name != "Görselden Algılandı":
-                    await page.get_by_placeholder("Search Last Name").fill(last_name)
-                else:
-                    return {"status": "UNKNOWN", "label": "Eksik Veri", "message": "Arama için lisans numarası veya geçerli bir isim bulunamadı.", "url": url}
-                
-                # Enter tuşu ile aramayı tetikle
-                await page.keyboard.press("Enter")
-                
-                # Sitenin API isteğini tamamlamasını (ağ trafiğinin durmasını) bekle
-                await page.wait_for_load_state("networkidle")
-                
-                # Sonuç kontrolü (Ekranda sonuç kartı veya isim belirdi mi?)
-                results_count = await page.locator(".result-card").count()
-                
-                if results_count > 0:
-                    return {
-                        "status": "VALID",
-                        "label": "Sistemden Döndü",
-                        "message": "İtalya Bakanlık sisteminde onaylandı.",
-                        "url": url
-                    }
-                return {
-                    "status": "INVALID",
-                    "label": "Sistemden Döndü",
-                    "message": "Kayıt bulunamadı.",
-                    "url": url
-                }
-                
-            except Exception as e:
-                return {
-                    "status": "UNKNOWN",
-                    "label": "Doğruluğu Kesinleştirilemedi",
-                    "message": str(e),
-                    "url": url
-                }
-            finally:
-                await browser.close()
+        return {
+            "status": "UNKNOWN",
+            "label": "Eksik Veri",
+            "message": excel_result["message"]
+        }

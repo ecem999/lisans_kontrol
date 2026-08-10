@@ -34,61 +34,20 @@ class FranceValidator(BaseValidator):
             }
 
     async def _check_siret_and_registry(self, guide_data: dict) -> dict:
-        from playwright.async_api import async_playwright
+        from utils.excel_validator import check_guide_in_excel
         
-        url = "https://fngic.fr/en/members"
+        excel_result = await check_guide_in_excel("france", guide_data.get("name", ""))
         
-        # Öncelik isimde, yoksa lisans numarasını arama terimi olarak kullanalım.
-        search_term = guide_data.get("name")
-        if not search_term or search_term in ["Bilinmiyor", "Görselden Algılandı"]:
-            search_term = guide_data.get("license_no", "")
+        if excel_result["status"] == "VALID":
+            return {
+                "status": "VALID",
+                "label": "Sistemden Döndü",
+                "message": excel_result["message"],
+                "url": excel_result.get("url")
+            }
             
-        if not search_term:
-            return {"status": "UNKNOWN", "label": "Eksik Veri", "message": "Arama için lisans numarası veya geçerli bir isim bulunamadı.", "url": url}
-        
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
-            
-            try:
-                await page.goto(url, timeout=30000)
-                
-                # Eğer "Advanced research" alanı kapalıysa tıklayıp açmak gerekebilir
-                # await page.get_by_text("Advanced research").click()
-                
-                # "Name" başlığının hemen altındaki input alanını bul ve doldur
-                # CSS Selector alternatifi: input[name='name'] veya benzeri bir ID
-                await page.locator("label:has-text('Name') + input, input[name='name']").first.fill(search_term)
-                
-                # Search butonuna tıkla
-                await page.get_by_role("button", name="Search").click()
-                
-                # Sayfanın veya AJAX isteğinin yüklenmesini bekle
-                await page.wait_for_load_state("networkidle")
-                
-                # Sonuçları doğrula
-                no_results = await page.locator("text='No results'").is_visible()
-                
-                if not no_results:
-                    return {
-                        "status": "VALID",
-                        "label": "Sistemden Döndü",
-                        "message": "FNGIC sisteminde doğrulandı.",
-                        "url": url
-                    }
-                return {
-                    "status": "INVALID",
-                    "label": "Sistemden Döndü",
-                    "message": "FNGIC sisteminde kayıt bulunamadı.",
-                    "url": url
-                }
-                
-            except Exception as e:
-                return {
-                    "status": "UNKNOWN",
-                    "label": "Doğruluğu Kesinleştirilemedi",
-                    "message": str(e),
-                    "url": url
-                }
-            finally:
-                await browser.close()
+        return {
+            "status": "UNKNOWN",
+            "label": "Eksik Veri",
+            "message": excel_result["message"]
+        }
