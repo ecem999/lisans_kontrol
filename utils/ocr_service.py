@@ -3,18 +3,28 @@ import pytesseract
 import re
 import os
 import logging
-from pyzbar.pyzbar import decode
+try:
+    from pyzbar.pyzbar import decode
+except ImportError:
+    decode = None
+
+try:
+    from qreader import QReader
+except ImportError:
+    QReader = None
+
 from config import COUNTRIES_CONFIG
-from qreader import QReader
 from utils.logger import get_logger
 
 # Global olarak QReader modelini bir kez yükle ki her istekte baştan yüklemesin
-qreader = None
+qreader_instance = None
 def get_qreader():
-    global qreader
-    if qreader is None:
-        qreader = QReader()
-    return qreader
+    global qreader_instance
+    if QReader is None:
+        return None
+    if qreader_instance is None:
+        qreader_instance = QReader()
+    return qreader_instance
 
 logger = logging.getLogger(__name__)
 
