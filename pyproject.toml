@@ -1,2 +1,8 @@
+[project]
+name = "lisans-kontrol"
+version = "0.1.0"
+description = "Lisans Kontrol API"
+requires-python = ">=3.9"
+
 [tool.vercel]
 entrypoint = "api:app"
