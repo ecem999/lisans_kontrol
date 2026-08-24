@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     libgl1 \
     libgomp1 \
+    libzbar0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Çalışma dizini
