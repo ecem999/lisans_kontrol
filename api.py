@@ -94,6 +94,19 @@ async def verify_image(
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
         
+    # [BELLEK OPTİMİZASYONU] Resmi işleme sokmadan önce küçült (OOM hatalarını engellemek için)
+    try:
+        from PIL import Image
+        with Image.open(file_path) as im:
+            # Sadece çok büyük resimleri küçült (max 1200 piksel)
+            im.thumbnail((1200, 1200), Image.Resampling.LANCZOS)
+            # RGB olarak kaydet (şeffaflık kanallarını at)
+            im = im.convert("RGB")
+            im.save(file_path, "JPEG", quality=85)
+            logger.info("Resim başarıyla küçültüldü ve belleğe optimize edildi.")
+    except Exception as img_e:
+        logger.warning(f"Resim küçültme işlemi başarısız: {img_e}")
+        
     try:
         ocr = OCRService()
         ocr_result = ocr.parse_image(file_path, country=country)
