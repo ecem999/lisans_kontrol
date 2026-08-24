@@ -1,5 +1,10 @@
 import asyncio
-from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
+try:
+    from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
+    PLAYWRIGHT_AVAILABLE = True
+except ImportError:
+    PLAYWRIGHT_AVAILABLE = False
+    PlaywrightTimeoutError = Exception
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -12,6 +17,9 @@ class AsyncScraper:
         """
         Belirtilen URL'ye gider, config'den gelen CSS seçicilerle formu doldurur ve sonucu okur.
         """
+        if not PLAYWRIGHT_AVAILABLE:
+            return {"status": "UNKNOWN", "message": "Web scraping modülü bu ortamda kullanılamıyor."}
+        
         async with async_playwright() as p:
             logger.info(f"Playwright Chromium başlatılıyor... (Timeout: 15000ms)")
             # Chromium'u başlat (bot tespitini zorlaştırmak için argümanlar eklendi)
