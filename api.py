@@ -98,8 +98,8 @@ async def verify_image(
     try:
         from PIL import Image
         with Image.open(file_path) as im:
-            # Sadece çok büyük resimleri küçült (max 1200 piksel)
-            im.thumbnail((1200, 1200), Image.Resampling.LANCZOS)
+            # Okunabilirliği bozmamak için limiti 1200'den 2000 piksele çıkardık
+            im.thumbnail((2000, 2000), Image.Resampling.LANCZOS)
             # RGB olarak kaydet (şeffaflık kanallarını at)
             im = im.convert("RGB")
             im.save(file_path, "JPEG", quality=85)
