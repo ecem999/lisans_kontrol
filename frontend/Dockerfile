@@ -16,6 +16,7 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 # Next.js uygulamasını derle
 RUN npm run build
 
+ENV HOST=0.0.0.0
 EXPOSE 3000
 
 CMD sh -c "npm start -- -p ${PORT:-3000}"
