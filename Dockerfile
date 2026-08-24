@@ -26,5 +26,5 @@ COPY . .
 # Railway 8000 portunu kullanır
 EXPOSE 8000
 
-# Sunucuyu başlat
-CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
+# Sunucuyu başlat - shell form kullanarak $PORT env variable'ı doğru okur
+CMD uvicorn api:app --host 0.0.0.0 --port ${PORT:-8000}
