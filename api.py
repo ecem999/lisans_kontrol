@@ -94,16 +94,23 @@ async def verify_image(
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
         
-    # [BELLEK OPTİMİZASYONU] Resmi işleme sokmadan önce küçült (OOM hatalarını engellemek için)
     try:
-        from PIL import Image
+        from PIL import Image, ImageEnhance
         with Image.open(file_path) as im:
-            # Okunabilirliği bozmamak için limiti 1200'den 2000 piksele çıkardık
+            # Okunabilirliği bozmamak için limiti 2000 pikselde tuttuk
             im.thumbnail((2000, 2000), Image.Resampling.LANCZOS)
+            
+            # OCR kalitesini artırmak için Keskinlik ve Kontrastı abartalım
+            sharp_enhancer = ImageEnhance.Sharpness(im)
+            im = sharp_enhancer.enhance(2.0) # 2 kat keskinleştir
+            
+            contrast_enhancer = ImageEnhance.Contrast(im)
+            im = contrast_enhancer.enhance(1.5) # %50 daha fazla kontrast
+            
             # RGB olarak kaydet (şeffaflık kanallarını at)
             im = im.convert("RGB")
-            im.save(file_path, "JPEG", quality=85)
-            logger.info("Resim başarıyla küçültüldü ve belleğe optimize edildi.")
+            im.save(file_path, "JPEG", quality=95)
+            logger.info("Resim başarıyla küçültüldü ve OCR için keskinleştirildi.")
     except Exception as img_e:
         logger.warning(f"Resim küçültme işlemi başarısız: {img_e}")
         
